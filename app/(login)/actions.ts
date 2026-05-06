@@ -317,8 +317,8 @@ export const deleteAccount = validatedActionWithUser(
     await db
       .update(users)
       .set({
-        deletedAt: sql`CURRENT_TIMESTAMP`,
-        email: sql`CONCAT(email, '-', id, '-deleted')` // Ensure email uniqueness
+        deletedAt: new Date(),
+        email: sql`${users.email} || '-' || ${users.id} || '-deleted'` // Ensure email uniqueness
       })
       .where(eq(users.id, user.id));
 

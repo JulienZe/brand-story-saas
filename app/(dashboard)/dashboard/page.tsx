@@ -31,7 +31,7 @@ function SubscriptionSkeleton() {
   return (
     <Card className="mb-8 h-[140px]">
       <CardHeader>
-        <CardTitle>Team Subscription</CardTitle>
+        <CardTitle>团队订阅</CardTitle>
       </CardHeader>
     </Card>
   );
@@ -43,26 +43,26 @@ function ManageSubscription() {
   return (
     <Card className="mb-8">
       <CardHeader>
-        <CardTitle>Team Subscription</CardTitle>
+        <CardTitle>团队订阅</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
             <div className="mb-4 sm:mb-0">
               <p className="font-medium">
-                Current Plan: {teamData?.planName || 'Free'}
+                当前方案: {teamData?.planName || '免费版'}
               </p>
               <p className="text-sm text-muted-foreground">
                 {teamData?.subscriptionStatus === 'active'
-                  ? 'Billed monthly'
+                  ? '按月计费'
                   : teamData?.subscriptionStatus === 'trialing'
-                  ? 'Trial period'
-                  : 'No active subscription'}
+                  ? '试用期'
+                  : '无活跃订阅'}
               </p>
             </div>
             <form action={customerPortalAction}>
               <Button type="submit" variant="outline">
-                Manage Subscription
+                管理订阅
               </Button>
             </form>
           </div>
@@ -76,7 +76,7 @@ function TeamMembersSkeleton() {
   return (
     <Card className="mb-8 h-[140px]">
       <CardHeader>
-        <CardTitle>Team Members</CardTitle>
+        <CardTitle>团队成员</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="animate-pulse space-y-4 mt-1">
@@ -101,17 +101,17 @@ function TeamMembers() {
   >(removeTeamMember, {});
 
   const getUserDisplayName = (user: Pick<User, 'id' | 'name' | 'email'>) => {
-    return user.name || user.email || 'Unknown User';
+    return user.name || user.email || '未知用户';
   };
 
   if (!teamData?.teamMembers?.length) {
     return (
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle>Team Members</CardTitle>
+          <CardTitle>团队成员</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">No team members yet.</p>
+          <p className="text-muted-foreground">暂无团队成员</p>
         </CardContent>
       </Card>
     );
@@ -120,7 +120,7 @@ function TeamMembers() {
   return (
     <Card className="mb-8">
       <CardHeader>
-        <CardTitle>Team Members</CardTitle>
+        <CardTitle>团队成员</CardTitle>
       </CardHeader>
       <CardContent>
         <ul className="space-y-4">
@@ -128,15 +128,6 @@ function TeamMembers() {
             <li key={member.id} className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <Avatar>
-                  {/* 
-                    This app doesn't save profile images, but here
-                    is how you'd show them:
-
-                    <AvatarImage
-                      src={member.user.image || ''}
-                      alt={getUserDisplayName(member.user)}
-                    />
-                  */}
                   <AvatarFallback>
                     {getUserDisplayName(member.user)
                       .split(' ')
@@ -148,8 +139,8 @@ function TeamMembers() {
                   <p className="font-medium">
                     {getUserDisplayName(member.user)}
                   </p>
-                  <p className="text-sm text-muted-foreground capitalize">
-                    {member.role}
+                  <p className="text-sm text-muted-foreground">
+                    {member.role === 'owner' ? '所有者' : '成员'}
                   </p>
                 </div>
               </div>
@@ -162,7 +153,7 @@ function TeamMembers() {
                     size="sm"
                     disabled={isRemovePending}
                   >
-                    {isRemovePending ? 'Removing...' : 'Remove'}
+                    {isRemovePending ? '移除中...' : '移除'}
                   </Button>
                 </form>
               ) : null}
@@ -181,7 +172,7 @@ function InviteTeamMemberSkeleton() {
   return (
     <Card className="h-[260px]">
       <CardHeader>
-        <CardTitle>Invite Team Member</CardTitle>
+        <CardTitle>邀请团队成员</CardTitle>
       </CardHeader>
     </Card>
   );
@@ -198,25 +189,25 @@ function InviteTeamMember() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Invite Team Member</CardTitle>
+        <CardTitle>邀请团队成员</CardTitle>
       </CardHeader>
       <CardContent>
         <form action={inviteAction} className="space-y-4">
           <div>
             <Label htmlFor="email" className="mb-2">
-              Email
+              邮箱
             </Label>
             <Input
               id="email"
               name="email"
               type="email"
-              placeholder="Enter email"
+              placeholder="请输入邮箱"
               required
               disabled={!isOwner}
             />
           </div>
           <div>
-            <Label>Role</Label>
+            <Label>角色</Label>
             <RadioGroup
               defaultValue="member"
               name="role"
@@ -225,11 +216,11 @@ function InviteTeamMember() {
             >
               <div className="flex items-center space-x-2 mt-2">
                 <RadioGroupItem value="member" id="member" />
-                <Label htmlFor="member">Member</Label>
+                <Label htmlFor="member">成员</Label>
               </div>
               <div className="flex items-center space-x-2 mt-2">
                 <RadioGroupItem value="owner" id="owner" />
-                <Label htmlFor="owner">Owner</Label>
+                <Label htmlFor="owner">所有者</Label>
               </div>
             </RadioGroup>
           </div>
@@ -247,12 +238,12 @@ function InviteTeamMember() {
             {isInvitePending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Inviting...
+                邀请中...
               </>
             ) : (
               <>
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Invite Member
+                邀请成员
               </>
             )}
           </Button>
@@ -261,7 +252,7 @@ function InviteTeamMember() {
       {!isOwner && (
         <CardFooter>
           <p className="text-sm text-muted-foreground">
-            You must be a team owner to invite new members.
+            需要团队所有者权限才能邀请新成员
           </p>
         </CardFooter>
       )}
@@ -272,7 +263,7 @@ function InviteTeamMember() {
 export default function SettingsPage() {
   return (
     <section className="flex-1 p-4 lg:p-8">
-      <h1 className="text-lg lg:text-2xl font-medium mb-6">Team Settings</h1>
+      <h1 className="text-lg lg:text-2xl font-medium mb-6">团队设置</h1>
       <Suspense fallback={<SubscriptionSkeleton />}>
         <ManageSubscription />
       </Suspense>

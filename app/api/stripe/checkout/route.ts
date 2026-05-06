@@ -3,8 +3,17 @@ import { db } from '@/lib/db/drizzle';
 import { users, teams, teamMembers } from '@/lib/db/schema';
 import { setSession } from '@/lib/auth/session';
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/payments/stripe';
+import { isStripeConfigured } from '@/lib/payments/stripe';
 import Stripe from 'stripe';
+
+function getStripeClient() {
+  if (!isStripeConfigured()) {
+    throw new Error('Stripe 未配置');
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: '2026-04-22.dahlia'
+  });
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -14,7 +23,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/pricing', request.url));
   }
 
+  if (!isStripeConfigured()) {
+    return NextResponse.redirect(new URL('/pricing', request.url));
+  }
+
   try {
+    const stripe = getStripeClient();
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['customer', 'subscription'],
     });

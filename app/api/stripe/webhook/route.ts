@@ -1,10 +1,20 @@
 import Stripe from 'stripe';
-import { handleSubscriptionChange, stripe } from '@/lib/payments/stripe';
+import { handleSubscriptionChange, isStripeConfigured } from '@/lib/payments/stripe';
 import { NextRequest, NextResponse } from 'next/server';
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
-
 export async function POST(request: NextRequest) {
+  if (!isStripeConfigured()) {
+    return NextResponse.json(
+      { error: 'Stripe 未配置' },
+      { status: 503 }
+    );
+  }
+
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: '2026-04-22.dahlia'
+  });
+
   const payload = await request.text();
   const signature = request.headers.get('stripe-signature') as string;
 

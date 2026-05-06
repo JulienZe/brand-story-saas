@@ -7,9 +7,21 @@ import {
   updateTeamSubscription
 } from '@/lib/db/queries';
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-04-30.basil'
-});
+function isStripeConfigured(): boolean {
+  const key = process.env.STRIPE_SECRET_KEY;
+  return !!key && !key.includes('placeholder');
+}
+
+function getStripe(): Stripe {
+  if (!isStripeConfigured()) {
+    throw new Error('Stripe 未配置。请在 .env 文件中设置有效的 STRIPE_SECRET_KEY。');
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: '2026-04-22.dahlia'
+  });
+}
+
+export { isStripeConfigured };
 
 export async function createCheckoutSession({
   team,
@@ -18,6 +30,11 @@ export async function createCheckoutSession({
   team: Team | null;
   priceId: string;
 }) {
+  if (!isStripeConfigured()) {
+    redirect('/pricing');
+  }
+
+  const stripe = getStripe();
   const user = await getUser();
 
   if (!team || !user) {
@@ -47,6 +64,12 @@ export async function createCheckoutSession({
 }
 
 export async function createCustomerPortalSession(team: Team) {
+  if (!isStripeConfigured()) {
+    redirect('/pricing');
+  }
+
+  const stripe = getStripe();
+
   if (!team.stripeCustomerId || !team.stripeProductId) {
     redirect('/pricing');
   }
@@ -147,6 +170,14 @@ export async function handleSubscriptionChange(
 }
 
 export async function getStripePrices() {
+  if (!isStripeConfigured()) {
+    return [
+      { id: 'price_base', productId: 'prod_base', unitAmount: 800, currency: 'cny', interval: 'month', trialPeriodDays: 7 },
+      { id: 'price_plus', productId: 'prod_plus', unitAmount: 1200, currency: 'cny', interval: 'month', trialPeriodDays: 7 }
+    ];
+  }
+
+  const stripe = getStripe();
   const prices = await stripe.prices.list({
     expand: ['data.product'],
     active: true,
@@ -165,6 +196,14 @@ export async function getStripePrices() {
 }
 
 export async function getStripeProducts() {
+  if (!isStripeConfigured()) {
+    return [
+      { id: 'prod_base', name: '基础版', description: '适合个人和小团队', defaultPriceId: 'price_base' },
+      { id: 'prod_plus', name: '专业版', description: '适合成长型企业', defaultPriceId: 'price_plus' }
+    ];
+  }
+
+  const stripe = getStripe();
   const products = await stripe.products.list({
     active: true,
     expand: ['data.default_price']
