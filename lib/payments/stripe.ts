@@ -17,7 +17,7 @@ function getStripe(): Stripe {
     throw new Error('Stripe 未配置。请在 .env 文件中设置有效的 STRIPE_SECRET_KEY。');
   }
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2026-04-22.dahlia'
+    apiVersion: '2026-04-22.dahlia' as Stripe.LatestApiVersion
   });
 }
 

@@ -5,9 +5,19 @@ export interface ContentGeneratorConfig {
   model?: string;
 }
 
+export interface GenerationResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  provider: string;
+  model: string;
+  duration: number;
+  tokensUsed?: { input: number; output: number };
+}
+
 export class ContentGenerator {
   private config: ContentGeneratorConfig;
-  private generationHistory: any[] = [];
+  private generationHistory: GenerationResult[] = [];
 
   constructor(config: ContentGeneratorConfig = { provider: 'mock' }) {
     this.config = { model: 'gpt-4', ...config };
@@ -16,34 +26,49 @@ export class ContentGenerator {
   async generate(prompt: any, options: any = {}): Promise<any> {
     const startTime = Date.now();
 
-    let result: any;
-    switch (this.config.provider) {
-      case 'openai':
-        result = await this._generateWithOpenAI(prompt, options);
-        break;
-      case 'claude':
-        result = await this._generateWithClaude(prompt, options);
-        break;
-      case 'deepseek':
-        result = await this._generateWithDeepSeek(prompt, options);
-        break;
-      case 'ollama':
-        result = await this._generateWithOllama(prompt, options);
-        break;
-      case 'mock':
-      default:
-        result = await this._generateWithMock(prompt, options);
-        break;
+    try {
+      let result: any;
+      switch (this.config.provider) {
+        case 'openai':
+          result = await this._generateWithOpenAI(prompt, options);
+          break;
+        case 'claude':
+          result = await this._generateWithClaude(prompt, options);
+          break;
+        case 'deepseek':
+          result = await this._generateWithDeepSeek(prompt, options);
+          break;
+        case 'siliconflow':
+          result = await this._generateWithSiliconFlow(prompt, options);
+          break;
+        case 'ollama':
+          result = await this._generateWithOllama(prompt, options);
+          break;
+        case 'mock':
+        default:
+          result = await this._generateWithMock(prompt, options);
+          break;
+      }
+
+      this.generationHistory.push({
+        success: true,
+        provider: this.config.provider,
+        model: this.config.model || 'unknown',
+        duration: Date.now() - startTime,
+        data: result,
+      });
+
+      return result;
+    } catch (error: any) {
+      this.generationHistory.push({
+        success: false,
+        provider: this.config.provider,
+        model: this.config.model || 'unknown',
+        duration: Date.now() - startTime,
+        error: error.message,
+      });
+      throw error;
     }
-
-    this.generationHistory.push({
-      timestamp: new Date().toISOString(),
-      provider: this.config.provider,
-      duration: Date.now() - startTime,
-      success: true
-    });
-
-    return result;
   }
 
   private async _generateWithMock(prompt: any, options: any): Promise<any> {
@@ -146,6 +171,10 @@ export class ContentGenerator {
   }
 
   private async _generateWithOpenAI(prompt: any, options: any): Promise<any> {
+    if (!this.config.apiKey) {
+      throw new Error('OpenAI API Key 未配置。请在环境变量中设置 AI_API_KEY。');
+    }
+
     const systemPrompt = typeof prompt === 'object' ? prompt.system : '';
     const userPrompt = typeof prompt === 'object' ? prompt.user : prompt;
 
@@ -154,41 +183,67 @@ export class ContentGenerator {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.config.apiKey}` },
       body: JSON.stringify({
         model: options.model || this.config.model,
-        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
         temperature: options.temperature || 0.7,
-        max_tokens: options.maxTokens || 2000
-      })
+        max_tokens: options.maxTokens || 2000,
+        response_format: { type: 'json_object' },
+      }),
     });
 
-    if (!response.ok) throw new Error(`OpenAI API 错误: ${response.status}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMsg = errorData?.error?.message || response.statusText;
+      throw new Error(`OpenAI API 错误 (${response.status}): ${errorMsg}`);
+    }
+
     const data = await response.json();
-    const content = data.choices[0].message.content;
+    const content = data.choices?.[0]?.message?.content || '';
     try { return JSON.parse(content); } catch { return { content }; }
   }
 
   private async _generateWithClaude(prompt: any, options: any): Promise<any> {
+    if (!this.config.apiKey) {
+      throw new Error('Claude API Key 未配置。请在环境变量中设置 AI_API_KEY。');
+    }
+
     const systemPrompt = typeof prompt === 'object' ? prompt.system : '';
     const userPrompt = typeof prompt === 'object' ? prompt.user : prompt;
 
     const response = await fetch(`${this.config.baseUrl || 'https://api.anthropic.com'}/v1/messages`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': this.config.apiKey || '', 'anthropic-version': '2023-06-01' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': this.config.apiKey,
+        'anthropic-version': '2024-10-22',
+      },
       body: JSON.stringify({
-        model: options.model || this.config.model || 'claude-3-sonnet-20240229',
+        model: options.model || this.config.model || 'claude-3-5-sonnet-20241022',
         max_tokens: options.maxTokens || 2000,
         temperature: options.temperature || 0.7,
         system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }]
-      })
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
     });
 
-    if (!response.ok) throw new Error(`Claude API 错误: ${response.status}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMsg = errorData?.error?.message || response.statusText;
+      throw new Error(`Claude API 错误 (${response.status}): ${errorMsg}`);
+    }
+
     const data = await response.json();
     const content = data.content?.[0]?.text || '';
     try { return JSON.parse(content); } catch { return { content }; }
   }
 
   private async _generateWithDeepSeek(prompt: any, options: any): Promise<any> {
+    if (!this.config.apiKey) {
+      throw new Error('DeepSeek API Key 未配置。请在环境变量中设置 AI_API_KEY。');
+    }
+
     const systemPrompt = typeof prompt === 'object' ? prompt.system : '';
     const userPrompt = typeof prompt === 'object' ? prompt.user : prompt;
 
@@ -197,13 +252,56 @@ export class ContentGenerator {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.config.apiKey}` },
       body: JSON.stringify({
         model: options.model || this.config.model || 'deepseek-chat',
-        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
         temperature: options.temperature || 0.7,
-        max_tokens: options.maxTokens || 2000
-      })
+        max_tokens: options.maxTokens || 2000,
+        response_format: { type: 'json_object' },
+      }),
     });
 
-    if (!response.ok) throw new Error(`DeepSeek API 错误: ${response.status}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMsg = errorData?.error?.message || response.statusText;
+      throw new Error(`DeepSeek API 错误 (${response.status}): ${errorMsg}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    try { return JSON.parse(content); } catch { return { content }; }
+  }
+
+  private async _generateWithSiliconFlow(prompt: any, options: any): Promise<any> {
+    if (!this.config.apiKey) {
+      throw new Error('硅基流动 API Key 未配置。请在环境变量中设置 AI_API_KEY。');
+    }
+
+    const systemPrompt = typeof prompt === 'object' ? prompt.system : '';
+    const userPrompt = typeof prompt === 'object' ? prompt.user : prompt;
+
+    const response = await fetch(`${this.config.baseUrl || 'https://api.siliconflow.cn/v1'}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.config.apiKey}` },
+      body: JSON.stringify({
+        model: options.model || this.config.model || 'Qwen/Qwen2.5-7B-Instruct',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: options.temperature || 0.7,
+        max_tokens: options.maxTokens || 2000,
+        response_format: { type: 'json_object' },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMsg = errorData?.error?.message || errorData?.message || response.statusText;
+      throw new Error(`硅基流动 API 错误 (${response.status}): ${errorMsg}`);
+    }
+
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || '';
     try { return JSON.parse(content); } catch { return { content }; }
@@ -214,18 +312,36 @@ export class ContentGenerator {
     const userPrompt = typeof prompt === 'object' ? prompt.user : prompt;
     const fullPrompt = systemPrompt ? `${systemPrompt}\n\n---\n\n${userPrompt}` : userPrompt;
 
-    const response = await fetch(`${this.config.baseUrl || 'http://localhost:11434'}/api/generate`, {
+    const baseUrl = this.config.baseUrl || 'http://localhost:11434';
+
+    try {
+      const healthCheck = await fetch(`${baseUrl}/api/tags`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!healthCheck.ok) {
+        throw new Error('Ollama 服务不可用，请确认 Ollama 已启动。');
+      }
+    } catch (e: any) {
+      throw new Error(`Ollama 连接失败: ${e.message}。请确认 Ollama 已启动且运行在 ${baseUrl}。`);
+    }
+
+    const response = await fetch(`${baseUrl}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: options.model || this.config.model || 'qwen2.5:7b',
         prompt: fullPrompt,
         stream: false,
-        options: { temperature: options.temperature || 0.7, num_predict: options.maxTokens || 2000 }
-      })
+        options: { temperature: options.temperature || 0.7, num_predict: options.maxTokens || 2000 },
+      }),
     });
 
-    if (!response.ok) throw new Error(`Ollama API 错误: ${response.status}`);
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(`Ollama API 错误 (${response.status}): ${errorText}`);
+    }
+
     const data = await response.json();
     const content = data.response || '';
     try { return JSON.parse(content); } catch { return { content }; }
@@ -241,7 +357,18 @@ export class ContentGenerator {
       successRate: this.generationHistory.length > 0
         ? this.generationHistory.filter(h => h.success).length / this.generationHistory.length
         : 0,
-      provider: this.config.provider
+      provider: this.config.provider,
+      model: this.config.model,
+      lastError: this.generationHistory.filter(h => !h.success).slice(-1)[0]?.error || null,
+    };
+  }
+
+  getConfig() {
+    return {
+      provider: this.config.provider,
+      model: this.config.model,
+      hasApiKey: !!this.config.apiKey,
+      baseUrl: this.config.baseUrl || 'default',
     };
   }
 }

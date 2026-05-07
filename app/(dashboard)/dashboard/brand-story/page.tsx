@@ -6,7 +6,8 @@ import {
   Sparkles, BookOpen, Loader2, Target, BarChart3, Lightbulb,
   ArrowRight, ArrowLeft, PenLine, Clock, Star, Eye, User,
   Shield, Heart, Film, Zap, ChevronRight, Check, Download,
-  Copy, CheckCircle, Edit3, RefreshCw, MessageSquare, X
+  Copy, CheckCircle, Edit3, RefreshCw, MessageSquare, X,
+  Cpu, Key, Settings2, AlertCircle
 } from 'lucide-react';
 
 const TEMPLATES = [
@@ -49,6 +50,15 @@ const CHANNELS = [
   { id: 'zhihu', name: '知乎', icon: '💡', format: '问答体', length: '1500-3000字', style: '专业分析' },
 ];
 
+const AI_PROVIDERS = [
+  { id: 'siliconflow', name: '硅基流动', icon: '🔥', desc: '国内可用，免费额度', requiresKey: true, defaultModel: 'Qwen/Qwen2.5-7B-Instruct' },
+  { id: 'deepseek', name: 'DeepSeek', icon: '🧠', desc: '高性价比，中文优秀', requiresKey: true, defaultModel: 'deepseek-chat' },
+  { id: 'openai', name: 'OpenAI', icon: '🤖', desc: 'GPT-4，全球领先', requiresKey: true, defaultModel: 'gpt-4' },
+  { id: 'claude', name: 'Claude', icon: '🎭', desc: '创意写作，长文本', requiresKey: true, defaultModel: 'claude-3-5-sonnet-20241022' },
+  { id: 'ollama', name: 'Ollama', icon: '💻', desc: '本地部署，免费', requiresKey: false, defaultModel: 'qwen2.5:7b' },
+  { id: 'mock', name: '模拟模式', icon: '✨', desc: '无需API，快速体验', requiresKey: false, defaultModel: 'mock' },
+];
+
 interface StoryResult {
   metadata: { generatedAt: string; duration: number; version: string };
   productValue: {
@@ -82,6 +92,12 @@ export default function BrandStoryPage() {
   const [error, setError] = useState('');
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const abortRef = useRef<AbortController | null>(null);
+  const [aiProvider, setAiProvider] = useState('siliconflow');
+  const [aiApiKey, setAiApiKey] = useState('');
+  const [aiBaseUrl, setAiBaseUrl] = useState('');
+  const [aiModel, setAiModel] = useState('Qwen/Qwen2.5-32B-Instruct');
+  const [showAiConfig, setShowAiConfig] = useState(false);
+  const [serverAiConfig, setServerAiConfig] = useState<{ provider: string; isConfigured: boolean } | null>(null);
 
   const nameError = touched.name && !formData.productName.trim() ? '请输入产品名称' : '';
   const descError = touched.desc && !formData.productDesc.trim() ? '请输入产品描述' : '';
@@ -127,6 +143,10 @@ export default function BrandStoryPage() {
           productFeatures: formData.productFeatures.split('\n').filter(f => f.trim()),
           template,
           tone,
+          provider: aiProvider,
+          apiKey: aiApiKey || undefined,
+          baseUrl: aiBaseUrl || undefined,
+          model: aiModel || undefined,
         }),
       });
 
@@ -169,7 +189,7 @@ export default function BrandStoryPage() {
         setStep(2);
       }
     }
-  }, [formData, template, tone]);
+  }, [formData, template, tone, aiProvider, aiApiKey, aiBaseUrl, aiModel]);
 
   const handleReset = useCallback(() => {
     setResult(null);
@@ -430,6 +450,110 @@ export default function BrandStoryPage() {
                 </select>
               </div>
             </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm mt-5">
+            <button
+              type="button"
+              onClick={() => setShowAiConfig(!showAiConfig)}
+              className="flex items-center gap-2 text-sm font-semibold text-gray-800 w-full"
+            >
+              <Settings2 className="w-4 h-4 text-[#667eea]" />
+              <span>AI 模型配置</span>
+              {aiProvider !== 'mock' && aiApiKey && (
+                <span className="ml-auto flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                  <CheckCircle className="w-3 h-3" /> 已配置
+                </span>
+              )}
+              {aiProvider === 'mock' && (
+                <span className="ml-auto text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">模拟模式</span>
+              )}
+              <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${showAiConfig ? 'rotate-90' : ''}`} />
+            </button>
+
+            {showAiConfig && (
+              <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">选择 AI 服务商</label>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    {AI_PROVIDERS.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setAiProvider(p.id);
+                          setAiModel(p.defaultModel);
+                          if (p.id === 'mock' || p.id === 'ollama') {
+                            setAiApiKey('');
+                          }
+                        }}
+                        className={`relative p-3 rounded-xl border-2 text-center transition-all duration-200 ${
+                          aiProvider === p.id
+                            ? 'border-[#667eea] bg-[#667eea]/5'
+                            : 'border-gray-200 hover:border-[#667eea]/30'
+                        }`}
+                      >
+                        <span className="text-xl block mb-1">{p.icon}</span>
+                        <span className="text-xs font-medium text-gray-700 block">{p.name}</span>
+                        {aiProvider === p.id && (
+                          <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#667eea] flex items-center justify-center">
+                            <Check className="w-2.5 h-2.5 text-white" />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {AI_PROVIDERS.find(p => p.id === aiProvider)?.requiresKey && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                      <Key className="w-3 h-3 inline mr-1" />API Key
+                    </label>
+                    <input
+                      type="password"
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#667eea]/20 focus:border-[#667eea] outline-none transition text-sm bg-[#f6f6f6]"
+                      placeholder={`输入 ${AI_PROVIDERS.find(p => p.id === aiProvider)?.name} API Key`}
+                      value={aiApiKey}
+                      onChange={(e) => setAiApiKey(e.target.value)}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">API Key 仅在本次会话使用，不会存储到服务器</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">模型</label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#667eea]/20 focus:border-[#667eea] outline-none transition text-sm bg-[#f6f6f6]"
+                      value={aiModel}
+                      onChange={(e) => setAiModel(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">自定义 Base URL <span className="text-gray-400">(选填)</span></label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#667eea]/20 focus:border-[#667eea] outline-none transition text-sm bg-[#f6f6f6]"
+                      placeholder="默认使用官方 API"
+                      value={aiBaseUrl}
+                      onChange={(e) => setAiBaseUrl(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {aiProvider !== 'mock' && !aiApiKey && AI_PROVIDERS.find(p => p.id === aiProvider)?.requiresKey && (
+                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                    <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-xs text-amber-700">
+                      <p className="font-medium">需要 API Key</p>
+                      <p className="mt-0.5">未配置 API Key 时将使用服务器默认配置。如服务器也未配置，将回退到模拟模式。</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {error && (

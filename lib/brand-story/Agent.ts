@@ -180,9 +180,12 @@ export class BrandStoryAgent {
     return {
       metadata: {
         generatedAt: new Date().toISOString(),
-        version: '2.1.0',
+        version: '3.0.0',
         workflowStages: 5,
-        duration: result.metadata?.duration
+        duration: result.metadata?.duration,
+        provider: this.contentGenerator.getConfig().provider,
+        model: this.contentGenerator.getConfig().model,
+        isMock: this.contentGenerator.getConfig().provider === 'mock',
       },
       productValue: {
         coreValue: result.valueProposition?.core || '',
